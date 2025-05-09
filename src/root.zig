@@ -208,9 +208,9 @@ pub fn Context(T: type) type {
             }
         };
 
-        const Point2D = @Vector(2, T);
+        pub const Point2D = @Vector(2, T);
 
-        const Orientation = enum {
+        pub const Orientation = enum {
             CounterClockwise,
             Collinear,
             Clockwise,
@@ -224,6 +224,11 @@ pub fn Context(T: type) type {
             } else {
                 return .Collinear;
             }
+        }
+
+        pub fn orient2DInexact(a: Point2D, b: Point2D, c: Point2D) Orientation {
+            const det = (a[0] - c[0]) * (b[1] - c[1]) - (a[1] - c[1]) * (b[0] - c[0]);
+            return orient2DByDeterminant(det);
         }
 
         pub fn orient2D(a: Point2D, b: Point2D, c: Point2D) Orientation {

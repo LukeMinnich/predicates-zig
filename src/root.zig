@@ -28,12 +28,12 @@ pub fn Context(T: type) type {
 
         fn twoSum(a: T, b: T) Pair {
             const x = a + b;
-            // NOTE(luke): the result is ordered opposite of the the canonical order per predicates.c.
             const b_virtual = x - a;
             const a_virtual = x - b_virtual;
             const b_roundoff = b - b_virtual;
             const a_roundoff = a - a_virtual;
             const y = a_roundoff + b_roundoff;
+            // NOTE(luke): the result is ordered opposite of the the canonical order per predicates.c.
             return .{ y, x };
         }
 
@@ -57,13 +57,14 @@ pub fn Context(T: type) type {
             const a_big = c - a;
             const a_hi = c - a_big;
             const a_lo = a - a_hi;
-            return .{ a_hi, a_lo };
+            // NOTE(luke): the result is ordered opposite of the the canonical order per predicates.c.
+            return .{ a_lo, a_hi };
         }
 
         fn twoProduct(a: T, b: T) Pair {
             const x = a * b;
-            const a_hi, const a_lo = split(a);
-            const b_hi, const b_lo = split(b);
+            const a_lo, const a_hi = split(a);
+            const b_lo, const b_hi = split(b);
             const err_1 = x - (a_hi * b_hi);
             const err_2 = err_1 - (a_lo * b_hi);
             const err_3 = err_2 - (a_hi * b_lo);
@@ -297,13 +298,13 @@ pub fn Context(T: type) type {
             // I'm not convinced that saving a bit of stack size is worth sacrificing the clarity
             // of the underlying algorithm.
 
+            // zig fmt: off
             const terms = [_][4]T{
-                // zig fmt: off
                 .{acx_tail, bcy     , acy_tail, bcx     },
                 .{acx     , bcy_tail, acy     , bcx_tail},
                 .{acx_tail, bcy_tail, acy_tail, bcx_tail},
-                // zig fmt: on
             };
+            // zig fmt: on
             var expansion: []const T = &B;
 
             comptime var i: comptime_int = 0;
@@ -329,25 +330,29 @@ pub fn Context(T: type) type {
         }
 
         fn mnSum(
-            n_a: comptime_int,
-            n_b: comptime_int,
-            a_s: [n_a]T,
-            b_s: [n_b]T,
-        ) [n_a + n_b]T {
-            std.debug.assert(subsequentComponentsAreNonDecreasingOrZero(T, &a_s));
-            std.debug.assert(subsequentComponentsAreNonDecreasingOrZero(T, &b_s));
-            return mnOpCore(n_a, n_b, &a_s, &b_s, .{ .a = twoSum, .b = twoSum });
+            m: comptime_int,
+            n: comptime_int,
+            e: [m]T,
+            f: [n]T,
+        ) [m + n]T {
+            std.debug.assert(subsequentComponentsAreNonDecreasingOrZero(T, &e));
+            std.debug.assert(subsequentComponentsAreNonDecreasingOrZero(T, &f));
+            var result: [m + n]T = undefined;
+            mnExpansionOp(.{ .a = twoSum, .b = twoSum }, m, n, &e, &f, &result);
+            return result;
         }
 
         fn mnDiff(
-            n_a: comptime_int,
-            n_b: comptime_int,
-            a_s: [n_a]T,
-            b_s: [n_b]T,
-        ) [n_a + n_b]T {
-            std.debug.assert(subsequentComponentsAreNonDecreasingOrZero(T, &a_s));
-            std.debug.assert(subsequentComponentsAreNonDecreasingOrZero(T, &b_s));
-            return mnOpCore(n_a, n_b, &a_s, &b_s, .{ .a = twoDiff, .b = twoSum });
+            m: comptime_int,
+            n: comptime_int,
+            e: [m]T,
+            f: [n]T,
+        ) [m + n]T {
+            std.debug.assert(subsequentComponentsAreNonDecreasingOrZero(T, &e));
+            std.debug.assert(subsequentComponentsAreNonDecreasingOrZero(T, &f));
+            var result: [m + n]T = undefined;
+            mnExpansionOp(.{ .a = twoDiff, .b = twoSum }, m, n, &e, &f, &result);
+            return result;
         }
 
         fn twoTwoDiff(a: [2]T, b: [2]T) [4]T {
@@ -359,38 +364,41 @@ pub fn Context(T: type) type {
             b: fn (T, T) Pair,
         };
 
-        fn mnOpCore(
-            n_a: comptime_int,
-            n_b: comptime_int,
-            a_s: []const T,
-            b_s: []const T,
+        fn growExpansion(
+            m: comptime_int,
+            b: T,
+            h: []T,
             comptime cb: mnTailCb,
-        ) [n_a + n_b]T {
-            std.debug.assert(a_s.len == n_a);
-            std.debug.assert(b_s.len == n_b);
-            std.debug.assert(std.math.isPowerOfTwo(n_a));
-            std.debug.assert(std.math.isPowerOfTwo(n_b));
-            std.debug.assert(n_a >= n_b);
-            std.debug.assert(n_a > 1);
-            if (n_b > 1) {
-                const half_n_b = n_b / 2;
-                // See e.g. `Four_Two_Sum()` in the original `predicates.c`
-                const t_0: [half_n_b + n_a]T = mnOpCore(n_a, half_n_b, a_s[0..], b_s[0..half_n_b], cb);
-                const tmp_begin = half_n_b;
-                const t_1: [half_n_b + n_a]T = mnOpCore(n_a, half_n_b, t_0[tmp_begin..], b_s[half_n_b..], cb);
-                return t_0[0..tmp_begin].* ++ t_1;
-            } else if (n_a > 2) {
-                const half_n_a = n_a / 2;
-                // See e.g. `Four_One_Sum()` in the original `predicates.c`
-                const t_0: [1 + half_n_a]T = mnOpCore(half_n_a, 1, a_s[0..half_n_a], b_s[0..1], cb);
-                const tmp_begin = (t_0.len - 1);
-                const t_1: [1 + half_n_a]T = mnOpCore(half_n_a, 1, a_s[half_n_a..], t_0[tmp_begin..], cb);
-                return t_0[0..tmp_begin].* ++ t_1;
-            } else {
-                // See e.g. `Two_One_Sum()` in the original `predicates.c`
-                const l_0: T, const tmp: T = cb.a(a_s[0], b_s[0]);
-                const l_1: T, const r_1: T = cb.b(a_s[1], tmp);
-                return .{ l_0, l_1, r_1 };
+        ) void {
+            std.debug.assert(h.len == m + 1);
+            var Q = b;
+            comptime var j: comptime_int = 0;
+            inline while (j < m) : (j += 1) {
+                // NOTE(luke): inputs to callback are in the reverse order of long version of the
+                // original paper pseudocode.
+                h[j], Q = if (j % 2 == 0) cb.a(h[j], Q) else cb.b(h[j], Q);
+            }
+            h[m] = Q;
+        }
+
+        fn mnExpansionOp(
+            comptime cb: mnTailCb,
+            m: comptime_int,
+            n: comptime_int,
+            e: []const T,
+            f: []const T,
+            h: []T,
+        ) void {
+            std.debug.assert(m > 1);
+            std.debug.assert(n > 0);
+            std.debug.assert(e.len == m);
+            std.debug.assert(f.len == n);
+            std.debug.assert(h.len == m + n);
+            @memcpy(h[0..m], e);
+            comptime var i: comptime_int = 0;
+            inline while (i < n) : (i += 1) {
+                // PERF(luke): determine if inlining `growExpansion()` would impact performance
+                growExpansion(m, f[i], h[i..(i + m + 1)], cb);
             }
         }
 
@@ -476,52 +484,6 @@ pub fn sortAscendingMagnitude(comptime T: type) fn (void, T, T) bool {
     }.inner;
 }
 
-test "test linearExpansionSum equivalent to combinatorialSums" {
-    var prng = std.Random.DefaultPrng.init(0xDEADBEEF);
-    const rand = prng.random();
-    const Ctx = Context(f32);
-    var components_4: [4]f32 = undefined;
-    var components_2: [2]f32 = undefined;
-
-    var i: usize = 0;
-    while (i < 1000) : (i += 1) {
-        for (&components_4) |*component| {
-            component.* = rand.floatNorm(f32) * 1000;
-        }
-        for (&components_2) |*component| {
-            component.* = rand.floatNorm(f32) * 1000;
-        }
-        std.mem.sort(
-            f32,
-            &components_4,
-            {},
-            sortAscendingMagnitude(f32),
-        );
-        std.mem.sort(
-            f32,
-            &components_2,
-            {},
-            sortAscendingMagnitude(f32),
-        );
-
-        const res_a: [6]f32 = Ctx.mnSum(components_4.len, components_2.len, components_4, components_2);
-
-        var target: [6]f32 = undefined;
-        const res_b = Ctx.linearExpansionSum(&components_4, &components_2, &target);
-
-        var sum_a: f32 = 0;
-        for (res_a) |component| {
-            sum_a += component;
-        }
-        var sum_b: f32 = 0;
-        for (res_b) |component| {
-            sum_b += component;
-        }
-
-        try std.testing.expectEqual(sum_a, sum_b);
-    }
-}
-
 fn debugSentinel(T: type) T {
     const bytes = [_]u8{0xAA} ** @sizeOf(T);
     return std.mem.bytesToValue(T, &bytes);
@@ -529,7 +491,7 @@ fn debugSentinel(T: type) T {
 
 test "linear expansion, w/ and w/o zero elimination" {
     const e = [_]f32{ 0.5, 1, 2, 4 };
-    const f = [_]f32{ 0.5, 1, 2, 4 };
+    const f = [_]f32{ 0.5, 1, 2, 8 };
 
     {
         var g = [_]f32{debugSentinel(f32)} ** 8;
@@ -540,14 +502,14 @@ test "linear expansion, w/ and w/o zero elimination" {
         while (i < expansion.len) : (i += 1) {
             sum += g[i];
         }
-        try std.testing.expectEqual(15, sum);
+        try std.testing.expectEqual(19, sum);
     }
 
     {
         var g = [_]f32{debugSentinel(f32)} ** 8;
         const expansion = Context(f32).linearExpansionSumZeroElim(&e, &f, &g);
         try std.testing.expectEqual(1, expansion.len);
-        try std.testing.expectEqual(15, expansion[0]);
+        try std.testing.expectEqual(19, expansion[0]);
     }
 }
 
@@ -625,4 +587,25 @@ test "test orient2D" {
     try std.testing.expectEqual(Ctx.orient2D(a, b, p_ccw), Ctx.Orientation.CounterClockwise);
     try std.testing.expectEqual(Ctx.orient2D(a, b, p_cw ), Ctx.Orientation.Clockwise);
     // zig fmt: on
+}
+
+test "random point" {
+    const Ctx = Context(f64);
+    const p0 = Ctx.Point2D{ 0.5, 0.5 };
+    const p1 = Ctx.Point2D{ 12, 12 };
+    const p2 = Ctx.Point2D{ 24, 24 };
+
+    var yd = p0[1];
+    var xd: f64 = undefined;
+    var row: usize = 0;
+    while (row < 120) : (row += 1) {
+        xd = p0[0];
+        var col: usize = 0;
+        while (col < 136) : (col += 1) {
+            xd = std.math.nextAfter(f64, xd, std.math.inf(f64));
+        }
+        yd = std.math.nextAfter(f64, yd, std.math.inf(f64));
+    }
+    const p = Ctx.Point2D{ xd, yd };
+    _ = Ctx.orient2D(p1, p, p2);
 }

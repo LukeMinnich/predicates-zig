@@ -20,6 +20,25 @@
             "args": ["naive", "orient2d", "orient2d-naive-f64.png"],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"
+        },        {
+            "name": "robust incircle",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/zig-out/bin/predicates-zig",
+            "preLaunchTask": "build",
+            "args": ["robust", "incircle", "incircle-robust-f64.png"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "naive incircle",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/zig-out/bin/predicates-zig",
+            "preLaunchTask": "build",
+            "args": ["naive", "incircle", "incircle-naive-f64.png"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
         },
         {
             "name": "(gdb) Launch Tests",

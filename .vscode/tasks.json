@@ -9,7 +9,8 @@
                 "build",
                 "install",
                 "--summary",
-                "all"
+                "all",
+                "-Doptimize=ReleaseFast"
             ]
         },
         {

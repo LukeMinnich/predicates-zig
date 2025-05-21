@@ -1,5 +1,6 @@
 const std = @import("std");
 const zigimg = @import("zigimg");
+const Instant = std.time.Instant;
 
 const dim: usize = 256;
 
@@ -22,20 +23,20 @@ pub fn main() !void {
 
     if (CheckArg.isNaive()) {
         if (CheckArg.orientTest()) {
-            Orient2DTests(f64).run(false, png_data);
+            _ = try Orient2DTests(f64).run(false, png_data);
         } else if (CheckArg.circleTest()) {
-            std.debug.print("not yet implemented\n", .{});
-            return;
+            _ = try InCircleTests(f64).run(false, png_data);
         } else {
             usage(args[0]);
             return;
         }
     } else if (CheckArg.isRobust()) {
         if (CheckArg.orientTest()) {
-            Orient2DTests(f64).run(true, png_data);
+            const elapsed_ms = try Orient2DTests(f64).run(true, png_data);
+            std.debug.print("computation time: {d:.3}ms", .{elapsed_ms});
         } else if (CheckArg.circleTest()) {
-            std.debug.print("not yet implemented\n", .{});
-            return;
+            const elapsed_ms = try InCircleTests(f64).run(true, png_data);
+            std.debug.print("computation time: {d:.3}ms", .{elapsed_ms});
         } else {
             usage(args[0]);
             return;
@@ -75,13 +76,15 @@ fn Orient2DTests(T: type) type {
         const nextAfter = std.math.nextAfter;
         const inf = std.math.inf(T);
 
-        fn run(comptime robust: bool, png_data: []u8) void {
+        fn run(comptime robust: bool, png_data: []u8) !f64 {
             std.debug.assert(png_data.len == 3 * dim * dim);
 
             const cb = if (robust) Ctx.orient2D else Ctx.orient2DInexact;
             const p0 = Ctx.Point2D{ 0.5, 0.5 };
             const p1 = Ctx.Point2D{ 12, 12 };
             const p2 = Ctx.Point2D{ 24, 24 };
+
+            var elapsed_ns: f64 = 0;
 
             var yd = p0[1];
             var row: usize = 0;
@@ -91,7 +94,13 @@ fn Orient2DTests(T: type) type {
                 while (col < dim) : (col += 1) {
                     const p = Ctx.Point2D{ xd, yd };
                     const png_idx = (row * dim + col) * 3;
-                    switch (cb(p1, p, p2)) {
+
+                    const start = try Instant.now();
+                    const value = cb(p1, p, p2);
+                    const end = try Instant.now();
+                    elapsed_ns += @floatFromInt(end.since(start));
+
+                    switch (value) {
                         .CounterClockwise => {
                             png_data[png_idx + 0] = 0xFF;
                             png_data[png_idx + 1] = 0xFF;
@@ -112,6 +121,66 @@ fn Orient2DTests(T: type) type {
                 }
                 yd = std.math.nextAfter(T, yd, inf);
             }
+
+            return elapsed_ns / 1000;
+        }
+    };
+}
+
+fn InCircleTests(T: type) type {
+    return struct {
+        const Ctx = lib.Context(T);
+        const nextAfter = std.math.nextAfter;
+        const inf = std.math.inf(T);
+
+        fn run(comptime robust: bool, png_data: []u8) !f64 {
+            std.debug.assert(png_data.len == 3 * dim * dim);
+
+            const cb = if (robust) Ctx.inCircle else Ctx.inCircleInexact;
+            const p0 = Ctx.Point2D{ 0.5, 0.5 };
+            const p1 = Ctx.Point2D{ 12, 12 };
+            const p2 = Ctx.Point2D{ 24, 24 };
+            const p3 = Ctx.Point2D{ -12, -12 };
+
+            var elapsed_ns: f64 = 0;
+
+            var yd = p0[1];
+            var row: usize = 0;
+            while (row < dim) : (row += 1) {
+                var xd = p0[0];
+                var col: usize = 0;
+                while (col < dim) : (col += 1) {
+                    const p = Ctx.Point2D{ xd, yd };
+                    const png_idx = (row * dim + col) * 3;
+
+                    const start = try Instant.now();
+                    const value = cb(p1, p2, p3, p);
+                    const end = try Instant.now();
+                    elapsed_ns += @floatFromInt(end.since(start));
+
+                    switch (value) {
+                        .Inside => {
+                            png_data[png_idx + 0] = 0xFF;
+                            png_data[png_idx + 1] = 0xFF;
+                            png_data[png_idx + 2] = 0xFF;
+                        },
+                        .On => {
+                            png_data[png_idx + 0] = 0xFF;
+                            png_data[png_idx + 1] = 0;
+                            png_data[png_idx + 2] = 0;
+                        },
+                        .Outside => {
+                            png_data[png_idx + 0] = 0;
+                            png_data[png_idx + 1] = 0;
+                            png_data[png_idx + 2] = 0;
+                        },
+                    }
+                    xd = std.math.nextAfter(T, xd, inf);
+                }
+                yd = std.math.nextAfter(T, yd, inf);
+            }
+
+            return elapsed_ns / 1000;
         }
     };
 }

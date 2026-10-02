@@ -536,8 +536,8 @@ pub fn Context(T: type) type {
 
             // The implementation ping-pongs between writing to each of these arrays. This is the
             // minimum size required from stages 1, 2, and 3, assuming no zero elimination occurs
-            var fin_1_array: [1152]T = undefined;
-            var fin_2_array: [1152]T = undefined;
+            var fin_1_array: [1151]T = undefined;
+            var fin_2_array: [1151]T = undefined;
 
             const Combo = struct {
                 fn stage1(x_s: [2]T, y_s: [2]T, scale_factors: [2]T, u: *[4]T, output: *[32]T) []const T {
@@ -548,8 +548,8 @@ pub fn Context(T: type) type {
                     var tmp_output: [2][16]T = undefined;
                     var expansions: [2][]const T = undefined;
 
-                    comptime var i: comptime_int = 0;
-                    inline while (i < 2) : (i += 1) {
+                    var i: usize = 0;
+                    while (i < 2) : (i += 1) {
                         var tmp: [8]T = undefined;
                         const expansion = scale(u, scale_factors[i], &tmp);
                         expansions[i] = scale(expansion, scale_factors[i], &tmp_output[i]);
@@ -564,8 +564,8 @@ pub fn Context(T: type) type {
                     scale_factors: [3]T,
                     begin_accum: []const T,
                     output: *[8]T,
-                    curr: **[1152]T,
-                    next: **[1152]T,
+                    ping: **[1152]T,
+                    pong: **[1152]T,
                 ) struct {
                     []const T,
                     []const T,
@@ -576,8 +576,8 @@ pub fn Context(T: type) type {
                     // NOTE(luke): this 8-component term is needed for later stage 3 computations
                     // though realistically, we could probably compute it again if needed
                     const stage_2 = stage_2: {
-                        const res = scale(&scale_these[0], tail, output);
-                        tmp16[0] = scale(res, scale_factors[0], &tmp16_[0]);
+                        const result = scale(&scale_these[0], tail, output);
+                        tmp16[0] = scale(result, scale_factors[0], &tmp16_[0]);
 
                         var i: usize = 1;
                         while (i < 3) : (i += 1) {
@@ -586,7 +586,7 @@ pub fn Context(T: type) type {
                             tmp16[i] = scale(tmp8, scale_factors[i], &tmp16_[i]);
                         }
 
-                        break :stage_2 res;
+                        break :stage_2 result;
                     };
 
                     const accum = accum: {
@@ -596,11 +596,11 @@ pub fn Context(T: type) type {
                         const tmp32 = sum(tmp16[0], tmp16[1], &tmp32_);
                         const tmp48 = sum(tmp32, tmp16[2], &tmp48_);
 
-                        const result = sum(begin_accum, tmp48, curr.*);
+                        const result = sum(begin_accum, tmp48, ping.*);
                         break :accum result;
                     };
 
-                    swap(curr, next);
+                    swap(ping, pong);
 
                     return .{ stage_2, accum };
                 }
@@ -669,7 +669,7 @@ pub fn Context(T: type) type {
                                 swap(curr, next);
                             }
 
-                            inline for (other_tails, 0..) |other, idx| {
+                            for (other_tails, 0..) |other, idx| {
                                 if (other[1] != 0) {
                                     var tmp8_: [8]T = undefined;
                                     var tmp16_: [16]T = undefined;
@@ -833,8 +833,8 @@ pub fn Context(T: type) type {
                 // zig fmt: on
             }
 
-            var curr = &fin_2_array;
-            var next = &fin_1_array;
+            var ping = &fin_2_array;
+            var pong = &fin_1_array;
             var accum = fin_1;
 
             var stage_2_: [6][8]T = undefined;
@@ -877,12 +877,12 @@ pub fn Context(T: type) type {
                             scale_factors,
                             accum,
                             &stage_2_[i],
-                            &curr,
-                            &next,
+                            &ping,
+                            &pong,
                         );
                     } else {
-                        stage_2_[i][0] = 1;
-                        stage_2[i] = &stage_2_[i];
+                        stage_2_[i][0] = 0;
+                        stage_2[i] = stage_2_[i][0..1];
                     }
                 }
             }
@@ -937,8 +937,8 @@ pub fn Context(T: type) type {
                         stage_2_parts,
                         expansion,
                         accum,
-                        &curr,
-                        &next,
+                        &ping,
+                        &pong,
                     );
                 }
             }
@@ -997,11 +997,11 @@ pub fn Context(T: type) type {
         ) void {
             std.debug.assert(h.len == m + 1);
             var Q = b;
-            comptime var j: comptime_int = 0;
-            inline while (j < m) : (j += 1) {
+            var i: usize = 0;
+            while (i < m) : (i += 1) {
                 // NOTE(luke): inputs to callback are in the reverse order of long version of the
                 // original paper pseudocode.
-                h[j], Q = if (j % 2 == 0) cb.a(h[j], Q) else cb.b(h[j], Q);
+                h[i], Q = if (i % 2 == 0) cb.a(h[i], Q) else cb.b(h[i], Q);
             }
             h[m] = Q;
         }
@@ -1026,8 +1026,8 @@ pub fn Context(T: type) type {
             std.debug.assert(subsequentComponentsAreNonDecreasingOrZero(T, f));
 
             @memcpy(h[0..m], e);
-            comptime var i: comptime_int = 0;
-            inline while (i < n) : (i += 1) {
+            var i: usize = 0;
+            while (i < n) : (i += 1) {
                 // PERF(luke): determine if inlining `growExpansion()` would impact performance
                 growExpansion(m, f[i], h[i..(i + m + 1)], cb);
             }

@@ -68,8 +68,13 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-
     exe.root_module.addImport("zigimg", zigimg_dependency.module("zigimg"));
+
+    const zbench_dependency = b.dependency("zbench", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    exe.root_module.addImport("zbench", zbench_dependency.module("zbench"));
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default

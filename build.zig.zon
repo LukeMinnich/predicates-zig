@@ -27,6 +27,9 @@
             .url = "git+https://github.com/zigimg/zigimg.git#cd874e1060a54f234c03101ad659b4cd294f126b",
             .hash = "1220fbda03a2fd580bfd724af3e2dcf3e4b77f6733141ed4a5d95a1dedfe2e17dc5d",
         },
+        .zbench = .{
+            .url = "https://github.com/hendriknielaender/zbench/archive/d8c7dd485306b88b757d52005614ebcb0a336942.tar.gz",
+        },
     },
     .paths = .{
         "build.zig",
